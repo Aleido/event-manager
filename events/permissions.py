@@ -4,6 +4,12 @@ class IsOrganizerOrReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow organizers of an event to edit it.
     """
+    def has_permission(self, request, view):
+        # Allow any authenticated user to create events
+        if request.method == 'POST':
+            return request.user and request.user.is_authenticated
+        return True
+
     def has_object_permission(self, request, view, obj):
         # Read permissions are allowed to any request
         if request.method in permissions.SAFE_METHODS:

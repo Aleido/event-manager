@@ -15,7 +15,7 @@ from .permissions import IsOrganizerOrReadOnly, IsEventOrganizerOrReadOnly
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOrganizerOrReadOnly]
+    permission_classes = [IsOrganizerOrReadOnly, permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['venue', 'start_date', 'end_date']
     search_fields = ['title', 'description', 'venue']
@@ -24,7 +24,7 @@ class EventViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(organizer=self.request.user)
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def register(self, request, pk=None):
         event = self.get_object()
         
@@ -65,10 +65,11 @@ class TrackViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsEventOrganizerOrReadOnly]
     
     def get_queryset(self):
-        return Track.objects.filter(
-            Q(event__organizer=self.request.user) | 
-            Q(event__registrations__attendee=self.request.user, event__registrations__status='confirmed')
-        ).distinct()
+        event_pk = self.kwargs.get('event_pk')
+        queryset = Track.objects.all()
+        if event_pk:
+            queryset = queryset.filter(event__pk=event_pk)
+        return queryset
     
     def perform_create(self, serializer):
         event = get_object_or_404(Event, pk=self.kwargs.get('event_pk'))
@@ -76,12 +77,21 @@ class TrackViewSet(viewsets.ModelViewSet):
             self.permission_denied(self.request, message='You are not the organizer of this event')
         serializer.save(event=event)
     
-    @action(detail=True, methods=['get'])
-    def sessions(self, request, pk=None):
+    @action(detail=True, methods=['get', 'post'])
+    def sessions(self, request, pk=None, event_pk=None):
         track = self.get_object()
-        sessions = track.sessions.all()
-        serializer = SessionSerializer(sessions, many=True)
-        return Response(serializer.data)
+        if request.method == 'GET':
+            sessions = track.sessions.all()
+            serializer = SessionSerializer(sessions, many=True)
+            return Response(serializer.data)
+        elif request.method == 'POST':
+            if track.event.organizer != request.user:
+                return Response({'detail': 'You are not the organizer of this event.'}, status=status.HTTP_403_FORBIDDEN)
+            serializer = SessionSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(track=track)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class SessionViewSet(viewsets.ModelViewSet):
@@ -93,21 +103,36 @@ class SessionViewSet(viewsets.ModelViewSet):
     ordering_fields = ['start_time', 'end_time']
     
     def get_queryset(self):
-        return Session.objects.filter(
+        track_pk = self.kwargs.get('track_pk')
+        event_pk = self.kwargs.get('event_pk')
+        queryset = Session.objects.all()
+        
+        if track_pk:
+            queryset = queryset.filter(track__pk=track_pk)
+            if event_pk:
+                queryset = queryset.filter(track__event__pk=event_pk)
+        
+        return queryset.filter(
             Q(track__event__organizer=self.request.user) | 
             Q(track__event__registrations__attendee=self.request.user, 
               track__event__registrations__status='confirmed')
         ).distinct()
     
     def perform_create(self, serializer):
-        track = get_object_or_404(Track, pk=self.kwargs.get('track_pk'))
+        track_pk = self.kwargs.get('track_pk')
+        track = get_object_or_404(Track, pk=track_pk)
+        
+        if not track:
+            self.permission_denied(self.request, message='Invalid track')
+        
         if track.event.organizer != self.request.user:
             self.permission_denied(self.request, message='You are not the organizer of this event')
+            
         serializer.save(track=track)
     
     @action(detail=True, methods=['post'])
-    def register(self, request, pk=None):
-        session = self.get_object()
+    def register(self, request, pk=None, event_pk=None, track_pk=None):
+        session = get_object_or_404(Session, pk=pk)
         
         # Check if user is registered for the event
         if not Registration.objects.filter(
@@ -151,14 +176,41 @@ class RegistrationViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status', 'event']
     
     def get_queryset(self):
+        if self.action == 'approve':
+            return Registration.objects.all()
         user = self.request.user
         if user.is_staff:
             return Registration.objects.all()
-        return Registration.objects.filter(
+        queryset = Registration.objects.filter(
             Q(attendee=user) | Q(event__organizer=user)
         )
+        return queryset.order_by('-registration_date')
     
     def perform_create(self, serializer):
+        session = get_object_or_404(Session, pk=self.request.data.get('session_id'))
+        
+        # Check if user is registered for the event
+        if not Registration.objects.filter(
+            event=session.track.event,
+            attendee=self.request.user,
+            status='confirmed'
+        ).exists():
+            raise serializers.ValidationError(
+                {'detail': 'You must be registered for the event first.'}
+            )
+        
+        # Check if session is full
+        if session.capacity and session.attendees.count() >= session.capacity:
+            raise serializers.ValidationError(
+                {'detail': 'Session has reached maximum capacity.'}
+            )
+        
+        # Check if already registered
+        if SessionRegistration.objects.filter(session=session, attendee=self.request.user).exists():
+            raise serializers.ValidationError(
+                {'detail': 'You are already registered for this session.'}
+            )
+        
         serializer.save(attendee=self.request.user)
     
     @action(detail=True, methods=['post'])
@@ -187,7 +239,8 @@ class RegistrationViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        registration = self.get_object()
+        # Get registration without checking permissions first
+        registration = Registration.objects.get(pk=pk)
         
         # Check if user is the attendee or event organizer
         if registration.attendee != request.user and registration.event.organizer != request.user:
@@ -217,6 +270,30 @@ class SessionRegistrationViewSet(viewsets.ModelViewSet):
         )
     
     def perform_create(self, serializer):
+        session = get_object_or_404(Session, pk=self.request.data.get('session_id'))
+        
+        # Check if user is registered for the event
+        if not Registration.objects.filter(
+            event=session.track.event,
+            attendee=self.request.user,
+            status='confirmed'
+        ).exists():
+            raise serializers.ValidationError(
+                {'detail': 'You must be registered for the event first.'}
+            )
+        
+        # Check if session is full
+        if session.capacity and session.attendees.count() >= session.capacity:
+            raise serializers.ValidationError(
+                {'detail': 'Session has reached maximum capacity.'}
+            )
+        
+        # Check if already registered
+        if SessionRegistration.objects.filter(session=session, attendee=self.request.user).exists():
+            raise serializers.ValidationError(
+                {'detail': 'You are already registered for this session.'}
+            )
+        
         serializer.save(attendee=self.request.user)
     
     @action(detail=True, methods=['post'])

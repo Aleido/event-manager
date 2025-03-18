@@ -9,7 +9,7 @@ from .views import (
 router = DefaultRouter()
 router.register(r'events', EventViewSet)
 router.register(r'registrations', RegistrationViewSet)
-router.register(r'session-registrations', SessionRegistrationViewSet)
+router.register(r'session-registrations', SessionRegistrationViewSet, basename='session-registration')
 
 # Nested routes for tracks under events
 event_router = routers.NestedDefaultRouter(router, r'events', lookup='event')
