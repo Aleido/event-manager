@@ -80,6 +80,39 @@ A Django-based REST API for managing events, tracks, sessions, and registrations
 - Registration System
 - Permission-based Access Control
 
+## Authentication
+
+### Test User Credentials
+
+For testing purposes, you can use the following test user credentials:
+
+```
+Username: test_user
+Password: Test@123
+```
+
+### Obtaining JWT Tokens
+
+1. Get access and refresh tokens:
+   ```bash
+   curl -X POST http://localhost:8000/api/token/ \
+     -H "Content-Type: application/json" \
+     -d '{"username": "test_user", "password": "Test@123"}'   
+   ```
+
+2. Use the access token in subsequent requests:
+   ```bash
+   curl -H "Authorization: Bearer <your_access_token>" \
+     http://localhost:8000/api/events/
+   ```
+
+3. Refresh the access token:
+   ```bash
+   curl -X POST http://localhost:8000/api/token/refresh/ \
+     -H "Content-Type: application/json" \
+     -d '{"refresh": "<your_refresh_token>"}'   
+   ```
+
 ## Testing
 
 Run the test suite:
