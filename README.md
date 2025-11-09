@@ -33,7 +33,7 @@ A Django-based REST API for managing events, tracks, sessions, and registrations
 5. Access the API:
    - API Root: http://localhost:8000/api/
    - Admin Interface: http://localhost:8000/admin/
-   - API Documentation: http://localhost:8000/api/schema/swagger-ui/
+   - API Documentation: http://localhost:8000/api/docs/
 
 ## Development Setup
 

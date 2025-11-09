@@ -10,6 +10,8 @@ from .serializers import (
     RegistrationSerializer, SessionRegistrationSerializer
 )
 from .permissions import IsOrganizerOrReadOnly, IsEventOrganizerOrReadOnly
+from rest_framework.exceptions import PermissionDenied
+from drf_spectacular.utils import extend_schema
 
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -74,7 +76,7 @@ class TrackViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         event = get_object_or_404(Event, pk=self.kwargs.get('event_pk'))
         if event.organizer != self.request.user:
-            self.permission_denied(self.request, message='You are not the organizer of this event')
+            raise PermissionDenied('You are not the organizer of this event')
         serializer.save(event=event)
     
     @action(detail=True, methods=['get', 'post'])

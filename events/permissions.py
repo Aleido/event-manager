@@ -23,6 +23,24 @@ class IsEventOrganizerOrReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow organizers of an event to edit its related objects.
     """
+    def has_permission(self, request, view):
+        # Read permissions are allowed to any request
+        if request.method in permissions.SAFE_METHODS:
+            return True
+            
+        # For POST requests to create objects in nested routes
+        if request.method == 'POST':
+            # Check if this is a nested view with an event_pk
+            event_pk = view.kwargs.get('event_pk')
+            if event_pk:
+                from .models import Event
+                try:
+                    event = Event.objects.get(pk=event_pk)
+                    return event.organizer == request.user
+                except Event.DoesNotExist:
+                    return False
+        return True
+    
     def has_object_permission(self, request, view, obj):
         # Read permissions are allowed to any request
         if request.method in permissions.SAFE_METHODS:
