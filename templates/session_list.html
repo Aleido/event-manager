@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sessions</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Sessions</h1>
+        <div id="sessionsList"></div>
+    </div>
+
+    <script>
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/sessions/', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                const sessions = await response.json();
+                
+                const sessionsList = document.getElementById('sessionsList');
+                sessionsList.innerHTML = sessions.map(session => `
+                    <div class="card">
+                        <h3>${session.title}</h3>
+                        <p>${session.description}</p>
+                        <p>Start: ${new Date(session.start_time).toLocaleString()}</p>
+                        <p>End: ${new Date(session.end_time).toLocaleString()}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadSessions);
+    </script>
+</body>
+</html>

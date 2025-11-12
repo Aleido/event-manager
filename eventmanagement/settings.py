@@ -63,13 +63,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "eventmanagement.urls"
 
+# TEMPLATES setting (showing only the DIRS change)
 TEMPLATES = [
     {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        # {{ edit_2 }}
+        'DIRS': [BASE_DIR / 'templates'],  # Now BASE_DIR is defined
+        # {{ /edit_2 }}
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",

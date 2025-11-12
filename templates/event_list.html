@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Events</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .btn-primary {
+            background: #2d6cdf;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-section">
+            <h1>Upcoming Events</h1>
+            <div class="header-actions">
+                <a href="/events/create/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Event
+                </a>
+            </div>
+        </div>
+    
+        <div class="event-filters">
+            <input type="text" id="searchEvents" placeholder="Search events..." class="search-input">
+            <select id="eventSort" class="sort-select">
+                <option value="date-asc">Date (Oldest First)</option>
+                <option value="date-desc">Date (Newest First)</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+            </select>
+        </div>
+    
+        <div id="eventsList" class="event-grid">
+            <!-- Events will be loaded here dynamically -->
+        </div>
+    </div>
+
+    <script>
+        async function loadEvents() {
+            try {
+                const response = await fetch('/api/events/', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('API Response:', data); // Debug log
+                
+                // Handle different response formats
+                let events = [];
+                if (Array.isArray(data)) {
+                    events = data;
+                } else if (data && typeof data === 'object') {
+                    events = data.results || data.items || data.events || [data];
+                }
+                
+                if (events.length === 0) {
+                    console.warn('No events found in response');
+                }
+                
+                renderEvents(events);
+            } catch (error) {
+                console.error('Error loading events:', error);
+                document.getElementById('eventsList').innerHTML = `
+                    <div class="error">
+                        Error loading events: ${error.message}<br>
+                        <button onclick="loadEvents()" class="btn btn-primary">Retry</button>
+                    </div>
+                `;
+            }
+        }
+
+        <style>
+            .event-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 20px;
+                margin-top: 20px;
+            }
+            .event-card {
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                overflow: hidden;
+                transition: transform 0.2s;
+            }
+            .event-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            }
+            .event-header {
+                background: #2d6cdf;
+                color: white;
+                padding: 15px;
+            }
+            .event-body {
+                padding: 15px;
+            }
+            .event-meta {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 10px;
+                font-size: 0.9em;
+                color: #666;
+            }
+            .event-actions {
+                display: flex;
+                gap: 10px;
+                margin-top: 15px;
+            }
+            .btn {
+                padding: 8px 12px;
+                border-radius: 4px;
+                text-decoration: none;
+                font-size: 0.9em;
+            }
+            .btn-primary {
+                background: #2d6cdf;
+                color: white;
+            }
+            .btn-secondary {
+                background: #f0f0f0;
+                color: #333;
+                border: 1px solid #ddd;
+            }
+        </style>
+
+        // Update renderEvents function to use new HTML structure
+        function renderEvents(events) {
+            const eventsList = document.getElementById('eventsList');
+            
+            if (!events || !Array.isArray(events) || events.length === 0) {
+                eventsList.innerHTML = '<div class="no-events">No events found. Create your first event!</div>';
+                return;
+            }
+    
+            eventsList.innerHTML = events.map(event => `
+                <div class="event-card">
+                    <div class="event-header">
+                        <h3>${event.title || 'Untitled Event'}</h3>
+                    </div>
+                    <div class="event-body">
+                        <div class="event-meta">
+                            <span><i class="far fa-calendar-alt"></i> ${formatDate(event.start_date)}</span>
+                            <span><i class="fas fa-map-marker-alt"></i> ${event.venue || 'Online'}</span>
+                        </div>
+                        <p class="event-description">${event.description || 'No description available'}</p>
+                        <div class="event-actions">
+                            <a href="/events/${event.id}/" class="btn btn-secondary">Details</a>
+                            <a href="/events/${event.id}/register/" class="btn btn-primary">Register</a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Not specified';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        // Add this new function to handle refresh
+        function setupEventListeners() {
+            // Refresh button in error message will call loadEvents()
+            
+            // Add event listener for the create event button
+            document.querySelector('.btn-primary').addEventListener('click', () => {
+                // After creating an event, reload the list
+                setTimeout(loadEvents, 1000);
+            });
+            
+            // Add periodic refresh (every 30 seconds)
+            setInterval(loadEvents, 30000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('authToken')) {
+                window.location.href = '/';
+                return;
+            }
+            loadEvents();
+            setupEventListeners(); // Initialize event listeners
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Management System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .nav {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            padding: 10px 15px;
+            background: #2d6cdf;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .content {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 4px;
+        }
+        #login-section, #events-section, #tracks-section, #sessions-section {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Event Management System</h1>
+        
+        <div class="nav">
+            <a href="#" onclick="showSection('login-section')">Login</a>
+            <a href="#" onclick="showSection('events-section')">Events</a>
+            <a href="#" onclick="showSection('tracks-section')">Tracks</a>
+            <a href="#" onclick="showSection('sessions-section')">Sessions</a>
+        </div>
+
+        <div class="content">
+            <div id="login-section">
+                <!-- Login form will be loaded here -->
+                <h2>Login</h2>
+                <form id="login-form">
+                    <div>
+                        <label>Username:</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div>
+                        <label>Password:</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit">Login</button>
+                </form>
+            </div>
+
+            <div id="events-section">
+                <!-- Events content will be loaded here -->
+                <h2>Events</h2>
+                <div id="events-list"></div>
+                <button onclick="loadEventForm()">Create New Event</button>
+            </div>
+
+            <div id="tracks-section">
+                <!-- Tracks content will be loaded here -->
+                <h2>Tracks</h2>
+                <div id="tracks-list"></div>
+            </div>
+
+            <div id="sessions-section">
+                <!-- Sessions content will be loaded here -->
+                <h2>Sessions</h2>
+                <div id="sessions-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin + '/api';
+        let authToken = localStorage.getItem('authToken');
+    
+        // Show the login section by default
+        document.getElementById('login-section').style.display = 'block';
+    
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.content > div').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Show the selected section
+            document.getElementById(sectionId).style.display = 'block';
+            
+            // Load content if needed
+            if (sectionId === 'events-section' && authToken) {
+                loadEvents();
+            } else if (sectionId === 'tracks-section' && authToken) {
+                loadTracks();
+            } else if (sectionId === 'sessions-section' && authToken) {
+                loadSessions();
+            }
+        }
+    
+        async function loadEvents() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/events/`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const events = await response.json();
+                renderEvents(events);
+            } catch (error) {
+                console.error('Error loading events:', error);
+            }
+        }
+    
+        function renderEvents(events) {
+            const eventsList = document.getElementById('events-list');
+            eventsList.innerHTML = events.map(event => `
+                <div class="event-card">
+                    <h3>${event.title}</h3>
+                    <p>${event.description}</p>
+                    <p>Start: ${event.start_date}</p>
+                    <p>End: ${event.end_date}</p>
+                </div>
+            `).join('');
+        }
+    
+        async function loadTracks() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/tracks/`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const tracks = await response.json();
+                renderTracks(tracks);
+            } catch (error) {
+                console.error('Error loading tracks:', error);
+            }
+        }
+    
+        async function loadSessions() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/sessions/`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const sessions = await response.json();
+                renderSessions(sessions);
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+    
+        // Handle login form submission
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+    
+            try {
+                const response = await fetch(`${API_BASE_URL}/token/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (!response.ok) throw new Error('Login failed');
+                
+                const { access: token } = await response.json();
+                authToken = token;
+                localStorage.setItem('authToken', token);
+                showSection('events-section');
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Login failed. Please try again.');
+            }
+        });
+    
+        // Check for existing token on page load
+        if (authToken) {
+            showSection('events-section');
+        }
+    </script>
+</body>
+</html>

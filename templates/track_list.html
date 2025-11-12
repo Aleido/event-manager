@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tracks</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Tracks</h1>
+        <div id="tracksList"></div>
+    </div>
+
+    <script>
+        async function loadTracks() {
+            try {
+                const response = await fetch('/api/tracks/', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                const tracks = await response.json();
+                
+                const tracksList = document.getElementById('tracksList');
+                tracksList.innerHTML = tracks.map(track => `
+                    <div class="card">
+                        <h3>${track.name}</h3>
+                        <p>${track.description}</p>
+                        <a href="/tracks/${track.id}/sessions/" class="btn-secondary">View Sessions</a>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading tracks:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadTracks);
+    </script>
+</body>
+</html>
